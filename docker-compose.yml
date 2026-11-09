@@ -1,0 +1,151 @@
+# OASIS · Buscador de TFG UPM
+# Arranque: docker compose up -d
+
+name: oasis
+
+services:
+
+  pg:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      retries: 20
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.4
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "127.0.0.1:6333:6333"
+
+  # Crea la colección de vectores (768 dimensiones, embeddinggemma). Se ejecuta y termina.
+  qdrant-init:
+    image: curlimages/curl:latest
+    depends_on:
+      - qdrant
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until curl -sf http://qdrant:6333/readyz > /dev/null; do echo "Esperando a Qdrant..."; sleep 2; done
+        curl -s -X PUT http://qdrant:6333/collections/tfgs_gemma_atribustosESP \
+          -H 'Content-Type: application/json' \
+          -d '{"vectors":{"size":768,"distance":"Cosine"}}'
+        echo ""
+        echo "Colección lista (si ya existía, el error anterior es normal)."
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: 24h
+    volumes:
+      - ollama_data:/root/.ollama
+
+  # Descarga el modelo de embeddings la primera vez. Se ejecuta y termina.
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    restart: "no"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until ollama list > /dev/null 2>&1; do echo "Esperando a Ollama..."; sleep 2; done
+        ollama pull embeddinggemma
+
+  # Importa el workflow y las credenciales la primera vez. Se ejecuta y termina.
+  n8n-init:
+    image: docker.n8n.io/n8nio/n8n:2.44.6
+    depends_on:
+      pg:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n:/oasis:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ -f /home/node/.n8n/.oasis_importado ]; then
+          echo "OASIS ya estaba importado; no se toca nada."
+          exit 0
+        fi
+        cat > /tmp/credenciales.json << EOF
+        [
+          {"id": "oasisPostgres001", "name": "Postgres TFG", "type": "postgres",
+           "data": {"host": "pg", "port": 5432, "database": "$${POSTGRES_DB}", "user": "$${POSTGRES_USER}", "password": "$${POSTGRES_PASSWORD}", "ssl": "disable"}},
+          {"id": "oasisQdrant00001", "name": "Qdrant TFG", "type": "qdrantApi",
+           "data": {"qdrantUrl": "http://qdrant:6333", "apiKey": ""}},
+          {"id": "oasisOllamaCloud", "name": "Ollama Cloud", "type": "ollamaApi",
+           "data": {"baseUrl": "https://ollama.com", "apiKey": "$${OLLAMA_API_KEY}"}},
+          {"id": "oasisOllamaLocal", "name": "Ollama Embeddings (local)", "type": "ollamaApi",
+           "data": {"baseUrl": "http://ollama:11434", "apiKey": ""}}
+        ]
+        EOF
+        n8n import:credentials --input=/tmp/credenciales.json
+        n8n import:workflow --input=/oasis/workflow.json
+        rm /tmp/credenciales.json
+        touch /home/node/.n8n/.oasis_importado
+        echo "Workflow y credenciales importados."
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.44.6
+    restart: unless-stopped
+    depends_on:
+      n8n-init:
+        condition: service_completed_successfully
+      pg:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      ollama:
+        condition: service_started
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      WEBHOOK_URL: ${PUBLIC_URL}
+      N8N_PROXY_HOPS: "1"
+      GENERIC_TIMEZONE: Europe/Madrid
+      TZ: Europe/Madrid
+    volumes:
+      - n8n_data:/home/node/.n8n
+    ports:
+      - "127.0.0.1:5678:5678"
+
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - n8n
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
+volumes:
+  pg_data:
+  qdrant_data:
+  ollama_data:
+  n8n_data:

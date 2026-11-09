@@ -1,0 +1,1383 @@
+{
+  "name": "OASIS · Buscador de TFG UPM",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 1 · Ingesta de TFGs desde el OA-UPM\n**Carga inicial** (manual): en *Config carga*, `escuela` vacío = toda la UPM (o un código de escuela). Por bloques: `max_paginas` páginas de 25 TFGs desde `pagina_inicio`.\n**Actualización** (lunes 03:00): `escuelas` vacío = toda la UPM; 2 primeras páginas.\nAmbas omiten los TFG ya presentes en Postgres.",
+        "width": 1500,
+        "height": 820,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "name": "Nota ingesta",
+      "id": "74ff2e02-9422-57bf-9232-6b44a796bf5a",
+      "position": [
+        -3640,
+        -260
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "name": "Carga inicial (manual)",
+      "id": "f296fe6b-5292-5589-8b0b-ca85b9321532",
+      "position": [
+        -3560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "name": "Actualización semanal",
+      "id": "4419342f-2770-59e6-a57c-c2ea994d0457",
+      "position": [
+        -3560,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "m1",
+              "name": "modo",
+              "value": "carga",
+              "type": "string"
+            },
+            {
+              "id": "m4",
+              "name": "escuela",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "m3",
+              "name": "pagina_inicio",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "m2",
+              "name": "max_paginas",
+              "value": 4,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "name": "Config carga",
+      "id": "d607bfd8-5821-5fb0-8d3f-229e9814c16b",
+      "position": [
+        -3340,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "m1",
+              "name": "modo",
+              "value": "actualizacion",
+              "type": "string"
+            },
+            {
+              "id": "m4",
+              "name": "escuelas",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "m2",
+              "name": "max_paginas",
+              "value": 2,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "name": "Config actualización",
+      "id": "b4906bea-8348-594e-ac9a-6f9ac0d4ab2d",
+      "position": [
+        -3340,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id FROM tfg;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "name": "IDs existentes",
+      "id": "66de7247-4e00-519f-9c7d-c1da6af58bf4",
+      "position": [
+        -3120,
+        120
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "oasisPostgres001",
+          "name": "Postgres TFG"
+        }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url_primera }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2680,
+        120
+      ],
+      "id": "6c96253e-d1d4-5ea9-b87e-606cada705ab",
+      "name": "Obtener página web de la OA",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calcula las páginas de resultados de cada escuela a partir de su primera página.\nconst busquedas = $('Preparar búsqueda').all();\nconst salto = 25;\nconst out = [];\n\n$input.all().forEach((item, i) => {\n  const b = busquedas[i]?.json;\n  if (!b) return;\n  const html = String(item.json.data ?? '');\n\n  const regex = /<span[^>]*class=\"[^\"]*\\bep_search_number\\b[^\"]*\"[^>]*>(.*?)<\\/span>/gis;\n  const numeros = [];\n  let m;\n  while ((m = regex.exec(html)) !== null) {\n    const n = parseInt(m[1].replace(/<[^>]+>/g, '').replace(/[^\\d]/g, ''), 10);\n    if (!Number.isNaN(n)) numeros.push(n);\n  }\n  const total = numeros[2] ?? 0;\n  const paginasTotales = Math.ceil(total / salto);\n  const fin = b.max_paginas > 0 ? Math.min(paginasTotales, b.pagina_inicio + b.max_paginas) : paginasTotales;\n\n  for (let p = b.pagina_inicio; p < fin; p++) {\n    out.push({ json: {\n      escuela: b.escuela, pagina: p, offset: p * salto,\n      url: b.base + (p * salto), total_tfgs: total, paginas_totales: paginasTotales\n    }});\n  }\n});\n\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2460,
+        120
+      ],
+      "id": "370a393c-10a9-5d28-8ecc-9ab351be881e",
+      "name": "Extracción de páginas"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -2240,
+        120
+      ],
+      "id": "c90b5435-70e4-5faf-ada3-a516db3314a7",
+      "name": "Recorrer página"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2240,
+        300
+      ],
+      "id": "d94f3316-f6e9-5a67-bd88-7e386af3346d",
+      "name": "Obtener página de TFG",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "href",
+              "cssSelector": ".ep_search_result > div:nth-child(2) a[href^=\"https://oa.upm.es/\"]",
+              "returnValue": "attribute",
+              "attribute": "href",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -2020,
+        300
+      ],
+      "id": "fbe6a826-f33b-5a4a-a4fd-51b76dc8a99e",
+      "name": "Extraer link TFG"
+    },
+    {
+      "parameters": {
+        "jsCode": "const hrefs = $input.first().json.href|| [];\nconst urlsFiltradas = [];\n\nconst reBase = /^https:\\/\\/oa\\.upm\\.es\\/\\d+\\/$/;\n\nfor (const url of hrefs) {\n  if (reBase.test(url)) {\n    urlsFiltradas.push(url);\n  }\n}\n\nconst out = Array.from(new Set(urlsFiltradas));\n\nreturn out.map(u => ({ json: { url: u } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1800,
+        300
+      ],
+      "id": "9400cfac-de9e-5f13-8128-e44440a790a5",
+      "name": "Limpiar link"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Quita duplicados y descarta los TFG que ya están en Postgres.\n// Sustituye a los nodos 'Encontrado' + 'Eliminar encontrado y posteriores'\n// del workflow de actualización original.\nconst existentes = new Set(\n  $('IDs existentes').all().map(i => String(i.json.id ?? '')).filter(Boolean)\n);\nconst vistos = new Set();\nconst out = [];\nfor (const item of $input.all()) {\n  const url = item.json.url;\n  if (!url) continue;\n  const id = (url.match(/oa\\.upm\\.es\\/(\\d+)/) || [])[1];\n  if (!id || existentes.has(id) || vistos.has(id)) continue;\n  vistos.add(id);\n  out.push({ json: { url } });\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Filtrar TFGs nuevos",
+      "id": "7537959d-4005-5fd8-b543-2e74a84df69e",
+      "position": [
+        -2240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2 · Procesado de cada TFG (compartido por carga y actualización)\nDescarga la ficha, extrae metadatos, genera el texto a vectorizar, lo guarda en Qdrant y después en Postgres.\nCada TFG se guarda al terminarlo: si la ejecución se corta, lo ya procesado no se pierde.\nEmbeddings: embeddinggemma en el contenedor Ollama local (Ollama Cloud no ofrece embeddings).",
+        "width": 3500,
+        "height": 880,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "name": "Nota procesado",
+      "id": "d922684b-3fb2-58e0-98dd-47cdc872e47e",
+      "position": [
+        -2100,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -2020,
+        0
+      ],
+      "id": "c340582d-21d3-5d83-92aa-6bb41f797b7a",
+      "name": "Recorrer página TFG"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1800,
+        900
+      ],
+      "id": "c2fc1aa4-ca00-53f5-9e87-f6ecea7901ac",
+      "name": "Obtener página TFG",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d918e6ab-1fea-4684-8024-f7b46242f5c3",
+              "leftValue": "={{ /Acceso permitido solamente a usuarios en el campus de la UPM/i.test( String($json.data ?? \"\") ) }}",
+              "rightValue": "Acceso permitido solamente a usuarios en el campus de la UPM",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1580,
+        900
+      ],
+      "id": "7dff7b14-7c0f-5c03-9500-0b268f50e0dd",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  ...$json,\n  private: true\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1360,
+        800
+      ],
+      "id": "a140d63f-d6a0-5bb2-8988-f669418887a4",
+      "name": "Privado"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  ...$json,\n  private: false\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1360,
+        1040
+      ],
+      "id": "a75e698d-85fb-5888-894b-173a0b077cf9",
+      "name": "No privado"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "creators_name",
+              "cssSelector": "meta[name=\"eprints.creators_name\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "creators_id",
+              "cssSelector": "meta[name=\"eprints.creators_id\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "contributors_name",
+              "cssSelector": "meta[name=\"eprints.contributors_name\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "contributors_id",
+              "cssSelector": "meta[name=\"eprints.contributors_id\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "title",
+              "cssSelector": "meta[name=\"eprints.title\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "subjects",
+              "cssSelector": "meta[name=\"eprints.subjects\"] ",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "abstract",
+              "cssSelector": "meta[name=\"eprints.abstract\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "date",
+              "cssSelector": "meta[name=\"eprints.date\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "document_url",
+              "cssSelector": "meta[name=\"eprints.document_url\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "ods",
+              "cssSelector": "meta[name=\"eprints.ods\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "dc_publisher",
+              "cssSelector": "meta[name=\"DC.publisher\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "dc_rights",
+              "cssSelector": "meta[name=\"DC.rights\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -1140,
+        800
+      ],
+      "id": "b23e76b8-870a-5aef-90b5-ca1ce604c576",
+      "name": "Extracción atributos"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "creators_name",
+              "cssSelector": "meta[name=\"eprints.creators_name\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "creators_id",
+              "cssSelector": "meta[name=\"eprints.creators_id\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "contributors_name",
+              "cssSelector": "meta[name=\"eprints.contributors_name\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "contributors_id",
+              "cssSelector": "meta[name=\"eprints.contributors_id\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "title",
+              "cssSelector": "meta[name=\"eprints.title\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "subjects",
+              "cssSelector": "meta[name=\"eprints.subjects\"] ",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "abstract",
+              "cssSelector": "meta[name=\"eprints.abstract\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "date",
+              "cssSelector": "meta[name=\"eprints.date\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "document_url",
+              "cssSelector": "meta[name=\"eprints.document_url\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "ods",
+              "cssSelector": "meta[name=\"eprints.ods\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "dc_publisher",
+              "cssSelector": "meta[name=\"DC.publisher\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            },
+            {
+              "key": "dc_rights",
+              "cssSelector": "meta[name=\"DC.rights\"]",
+              "returnValue": "attribute",
+              "attribute": "content",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -1140,
+        1040
+      ],
+      "id": "bf13c984-70f7-5533-928f-cc75c496c1aa",
+      "name": "Extracción atributos1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      ...$items(\"Extracción atributos\")[0].json,\n      private: $('Privado').first().json.private\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -920,
+        800
+      ],
+      "id": "091cab46-c6f5-5f6b-a2db-82be75b55e2d",
+      "name": "Unir privado"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      ...$items(\"Extracción atributos1\")[0].json,\n      private: $('No privado').first().json.private\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -920,
+        1040
+      ],
+      "id": "955618d0-6f8b-541a-8f84-c346010ca61a",
+      "name": "Unir no privado"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = { ...$json };\n\nconst abs = Array.isArray(data.abstract)\n  ? data.abstract.join(' ')\n  : String(data.abstract || '').trim();\n\n\nconst parts = abs.split(/\\n*\\s*ABSTRACT\\s*\\n*/i);\n\nconst abstract_spanish = parts[0]?.trim() || '';\nconst abstract_english = parts[1]?.trim() || '';\n\ndelete data.abstract;\ndata.abstract_spanish = abstract_spanish;\ndata.abstract_english = abstract_english;\n\nreturn data;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -700,
+        920
+      ],
+      "id": "d0d88f2f-e942-5421-ab93-27795745e77a",
+      "name": "Separar abstract"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const arr = v => Array.isArray(v) ? v.filter(x => x != null && String(x).trim() !== '') : (v == null ? [] : [v]);\nconst first = v => arr(v)[0] ?? '';\n\nconst normalizeText = (s, max = 300000) => {\n  let t = String(s ?? '');\n\n  t = t.replace(/\\r\\n?/g, '\\n');\n  t = t.replace(/[ \\t]+\\n/g, '\\n');\n  t = t.replace(/\\n[ \\t]+/g, '\\n');\n  t = t.replace(/\\n{2,}/g, '\\n');\n  t = t.replace(/\\n{3,}/g, '\\n');\n  t = t.replace(/([^\\n])\\n(?!\\n)/g, '$1 ');\n\n  return t\n    .normalize('NFC')\n    .replace(/[^\\S\\n\\t]+/g, ' ')                  \n    .replace(/[\\u0000-\\u0008\\u000B-\\u001F\\u007F]/g, ' ')\n    .replace(/^\\s*(abstract|resumen)\\s*[:\\-–—]?\\s*/i, '')\n    .replace(/^[\\s:;,\\-–—]+/, '')                 \n    .trim()\n    .slice(0, max);\n};\n\nconst id =(first($json.document_url).match(/oa\\.upm\\.es\\/(\\d+)/)?.[1] ?? '');\n\nconst url    = id ? `https://oa.upm.es/${id}` : '';\nconst docUrl = first($json.document_url);\n\nconst title = normalizeText($json.title || $json['título']);\n\nconst rawEs = first($json.abstract_spanish) || first($json.abstract_es);\nconst rawEn = first($json.abstract_english) || first($json.abstract_en);\n\nconst absES = normalizeText(rawEs) || null;\nconst absEN = normalizeText(rawEn) || null;\n\nconst p = [\n  id,\n  title,\n  JSON.stringify(arr($json.creators_name)),\n  JSON.stringify(arr($json.creators_id)),\n  JSON.stringify(arr($json.contributors_name)),\n  JSON.stringify(arr($json.contributors_id)),\n  JSON.stringify(arr($json.subjects)),\n  JSON.stringify(arr($json.ods)),\n  first($json.date) || null,\n  url || null,\n  docUrl || null,\n  first($json.dc_publisher) || null,\n  JSON.stringify(arr($json.dc_rights)),\n  Boolean($json.private),\n  absES,\n  absEN\n];\n\nreturn { json: { params: p } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        920
+      ],
+      "id": "b018da34-dda4-5c45-b103-60da74678f5c",
+      "name": "Unir atributos y normalizar"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const p = $json.params;\n\nif (!Array.isArray(p) || p.length < 16) {\n  throw new Error('Faltan parámetros: esperaba 16 posiciones en `params`.');\n}\n\nconst obj = {\n  id: p[0],\n  title: p[1] || '',\n  creators_name: JSON.parse(p[2]  || '[]'),\n  creators_id: JSON.parse(p[3]  || '[]'),\n  contributors_name: JSON.parse(p[4] || '[]'),\n  contributors_id: JSON.parse(p[5]  || '[]'),\n  subjects: JSON.parse(p[6]  || '[]'),\n  ods: JSON.parse(p[7]  || '[]'),\n  date: p[8] || null,\n  url: p[9] || null,\n  document_url: p[10] || null,\n  dc_publisher: p[11] || null,\n  dc_rights: JSON.parse(p[12] || '[]'),\n  private: Boolean(p[13]),\n  abstract_es: p[14] || '',\n  abstract_en: p[15] || '',\n};\n\nconst list = a => (Array.isArray(a) ? a : []).filter(Boolean).join(', ');\nconst year = (obj.date || '').slice(0, 4);\n\nconst embed_text = [\n  obj.title && `[TITULO] ${obj.title}`,\n  obj.abstract_es && `[ABSTRACT_ES] ${obj.abstract_es}`,\n  obj.abstract_en && `[ABSTRACT_EN] ${obj.abstract_en}`,\n  obj.subjects?.length && `[ASIGNATURAS] ${list(obj.subjects)}`,\n  obj.ods?.length && `[ODS] ${list(obj.ods)}`,\n  year && `[FECHA] ${year}`,\n].filter(Boolean).join(' ');\n\nconst payload = {\n  id: obj.id,\n  url: obj.url,\n  url_pdf: obj.document_url,\n  titulo: obj.title,\n  autor: obj.creators_name,\n  autor_id: obj.creators_id,\n  director: obj.contributors_name,\n  director_id: obj.contributors_id,\n  asignaturas: obj.subjects,\n  ods: obj.ods,\n  fecha: obj.date,\n  institucion: obj.dc_publisher,\n  derechos: obj.dc_rights,\n  privado: obj.private,\n};\n\nreturn {\n  json: {\n    embed_text,\n    payload\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -260,
+        920
+      ],
+      "id": "acc07287-fb3b-5076-884a-cdbc5719419e",
+      "name": "Creación vector y metadatos"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "tfgs_gemma_atribustosESP",
+          "mode": "list",
+          "cachedResultName": "tfgs_gemma_atribustosESP"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        920
+      ],
+      "id": "91456188-7efb-591a-b425-d8e774c04723",
+      "name": "Qdrant Vector Store (indexación)",
+      "credentials": {
+        "qdrantApi": {
+          "id": "oasisQdrant00001",
+          "name": "Qdrant TFG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "embeddinggemma:latest"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        1200
+      ],
+      "id": "113fbe39-6455-54ef-8dcf-6b8945e6d1e9",
+      "name": "Embeddings Ollama (indexación)",
+      "credentials": {
+        "ollamaApi": {
+          "id": "oasisOllamaLocal",
+          "name": "Ollama Embeddings (local)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('Creación vector y metadatos').item.json.embed_text }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "payload",
+                "value": "={{ $('Creación vector y metadatos').item.json.payload }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        120,
+        1160
+      ],
+      "id": "d80dcad2-b46a-5f6f-8a6b-d06ccbe7f53f",
+      "name": "Default Data Loader",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "chunkSize": 800,
+        "chunkOverlap": 100,
+        "options": {
+          "splitCode": "markdown"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        200,
+        1340
+      ],
+      "id": "473f5b4e-b5f7-5ab7-8392-717c20870d73",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tfg (\n  id,\n  title,\n  creators_name,\n  creators_id,\n  contributors_name,\n  contributors_id,\n  subjects,\n  ods,\n  date,\n  url,\n  document_url,\n  dc_publisher,\n  dc_rights,\n  private,\n  abstract_es,\n  abstract_en,\n  created_at,\n  updated_at\n)\nVALUES (\n  $1,\n  $2,\n  $3::jsonb,\n  $4::jsonb,\n  $5::jsonb,\n  $6::jsonb,\n  $7::jsonb,\n  $8::jsonb,\n  $9,\n  $10,\n  $11,\n  $12,\n  $13::jsonb,\n  $14,\n  $15,\n  $16,\n  now(),\n  now()\n)\nON CONFLICT (id) DO UPDATE SET\n  title             = EXCLUDED.title,\n  creators_name     = EXCLUDED.creators_name,\n  creators_id       = EXCLUDED.creators_id,\n  contributors_name = EXCLUDED.contributors_name,\n  contributors_id   = EXCLUDED.contributors_id,\n  subjects          = EXCLUDED.subjects,\n  ods               = EXCLUDED.ods,\n  date              = EXCLUDED.date,\n  url               = EXCLUDED.url,\n  document_url      = EXCLUDED.document_url,\n  dc_publisher      = EXCLUDED.dc_publisher,\n  dc_rights         = EXCLUDED.dc_rights,\n  private           = EXCLUDED.private,\n  abstract_es       = EXCLUDED.abstract_es,\n  abstract_en       = EXCLUDED.abstract_en,\n  updated_at        = now()\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $('Unir atributos y normalizar').first().json.params }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        360,
+        920
+      ],
+      "id": "251a8041-06c0-503a-860a-f297c38ac59d",
+      "name": "Insertar TFG",
+      "credentials": {
+        "postgres": {
+          "id": "oasisPostgres001",
+          "name": "Postgres TFG"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        580,
+        920
+      ],
+      "id": "3f7f5a56-0de2-59ae-9c6f-251969542fd1",
+      "name": "Tiempo de espera",
+      "webhookId": "4dfccf67-c84a-4c1f-b0e8-690aa8739827"
+    },
+    {
+      "parameters": {
+        "content": "## 3 · Consulta: chat web público\nEl disparador sirve una página de chat en `<WEBHOOK_URL>/webhook/<id>/chat` (requiere publicar el workflow).\nLLM: Ollama Cloud. Búsqueda: Qdrant con los mismos embeddings que la indexación.\nLa memoria se separa por sesión de navegador.",
+        "width": 2300,
+        "height": 760,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "name": "Nota chat",
+      "id": "03745fc4-f81d-5cb3-ab69-1c380a9cb19f",
+      "position": [
+        -1100,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "public": true,
+        "mode": "webhook",
+        "initialMessages": "¡Hola! Soy el buscador de Trabajos Fin de Grado de la UPM.\nPregúntame por un tema, un autor, un año o un ODS.",
+        "options": {
+          "title": "Buscador de TFGs · UPM",
+          "subtitle": "Consulta los TFG publicados en el Archivo Digital UPM",
+          "inputPlaceholder": "Ej.: TFGs sobre inteligencia artificial en 2025",
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "name": "Chat web TFGs",
+      "id": "1cdc69d0-76c3-51d3-9fe9-bf4e7b84449b",
+      "position": [
+        -1000,
+        -560
+      ],
+      "webhookId": "3106d095-e051-5609-b2ea-2be91db4f815"
+    },
+    {
+      "parameters": {
+        "promptType": "auto",
+        "options": {
+          "systemMessage": "Eres un asistente experto en Trabajos Fin de Grado (TFGs) de la Universidad Politécnica de Madrid (UPM). Solo puedes responder con la información que devuelvan tus dos herramientas; nunca uses conocimiento propio sobre TFGs, personas o fechas.\n\nHERRAMIENTAS\n\n1. Buscar por persona: búsqueda exacta en la base de datos por el nombre del autor o del director (tutor).\n• Úsala SIEMPRE que la pregunta mencione a una persona: \"TFGs de…\", \"tutorizados por…\", \"dirigidos por…\", \"¿qué TFG hizo…?\".\n• rol = \"director\" si pregunta por tutor, director o quién dirigió; \"autor\" si pregunta por quién escribió el TFG; \"cualquiera\" si no está claro.\n• Todos los resultados que devuelve son correctos para esa persona y ese rol. Si devuelve 0 filas, no existe ninguno.\n\n2. Qdrant Vector Store: búsqueda semántica por tema o contenido.\n• Úsala para preguntas sobre temas, áreas, tecnologías, asignaturas u ODS (\"TFGs sobre ciberseguridad\").\n• Pásale la consulta del usuario tal como está escrita.\n• ATENCIÓN: siempre devuelve los 5 documentos más parecidos, aunque ninguno trate del tema. Revisa el título y el resumen de cada uno y quédate solo con los que traten realmente del tema preguntado.\n• No sirve para buscar nombres de personas ni años exactos.\n\nSi la pregunta combina persona y tema (\"TFGs de ciberseguridad dirigidos por X\"), usa Buscar por persona y quédate con los resultados cuyo título trate de ese tema.\n\nREGLAS DE RESPUESTA\n• Copia autor, director, fecha y URL exactamente como vienen en los resultados. Nunca atribuyas un TFG a una persona que no figure en esos campos.\n• No afirmes que un TFG cumple un criterio (persona, tema o año) si los datos no lo muestran.\n• Si después de revisar los resultados no queda ninguno que cumpla la pregunta, responde exactamente: \"No he encontrado ningún TFG con esos criterios en la base de datos.\"\n• En preguntas por año, presenta solo los resultados cuya fecha coincida y avisa de que la búsqueda por año puede no ser completa.\n\nFORMATO\n• Español claro, profesional y conciso.\n• Escribe en Markdown. El título de cada TFG debe ser un enlace a su URL: [Título completo](url). Si hay PDF, añade a continuación · [PDF](url_pdf). Nunca escribas las URL sueltas.\n• Debajo del título, autor, director y fecha.\n• Si hay varios, enuméralos. Ejemplo:\n1. [Bots de Trading en Mercados Financieros](https://oa.upm.es/91264/) · [PDF](https://oa.upm.es/91264/1/TFG.pdf)\n   Autor: … · Director: … · Fecha: …",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -560,
+        -560
+      ],
+      "id": "69a90e6b-f31e-5068-9b1a-12a8dd563b9a",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "gpt-oss:120b",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -760,
+        -300
+      ],
+      "id": "efba119e-9afc-51f0-9600-d6c67be1e02c",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "oasisOllamaCloud",
+          "name": "Ollama Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 5
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -560,
+        -300
+      ],
+      "id": "98011b3b-c435-5454-92d2-6db53e57fbd8",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Busca fragmentos relevantes de Trabajos Fin de Grado (TFGs) de la UPM.\n\nCada documento contiene:\n- El texto vectorizado en el campo `embed_text`, con etiquetas: [TITULO], [ABSTRACT_ES], [ABSTRACT_EN], [ASIGNATURAS], [ODS], [FECHA].\n- Metadatos completos en el payload: id, url, url_pdf, titulo, autor, autor_id, director, director_id, asignaturas, ods, fecha, institucion, derechos, privado.\n\nAl recibir una consulta del usuario:\n1. Usa la pregunta **exactamente como está escrita**, sin traducir ni reformular.\n2. Devuelve los documentos más relevantes según la similitud semántica del campo `embed_text`.\n3. Incluye siempre los metadatos del payload junto al texto del resultado.\n4.Si busca por fechas, buscar en el atributo fecha.\n\nEl objetivo es ofrecer solo información existente en Qdrant.\nNo inventes, combines ni infieras datos que no estén presentes en los resultados devueltos.\nSi no hay coincidencias relevantes, devuelve una respuesta vacía para que el agente diga:\n“No he encontrado ningún TFG con esos criterios en la base de datos.”",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "tfgs_gemma_atribustosESP",
+          "mode": "list",
+          "cachedResultName": "tfgs_gemma_atribustosESP"
+        },
+        "topK": 5,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        -340,
+        -300
+      ],
+      "id": "158c8080-c03d-5431-9d2b-ff1d94f04229",
+      "name": "Qdrant Vector Store",
+      "credentials": {
+        "qdrantApi": {
+          "id": "oasisQdrant00001",
+          "name": "Qdrant TFG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "embeddinggemma:latest"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        -100
+      ],
+      "id": "0a9ba560-91aa-5a25-93af-343b6002ecb1",
+      "name": "Embeddings Ollama",
+      "credentials": {
+        "ollamaApi": {
+          "id": "oasisOllamaLocal",
+          "name": "Ollama Embeddings (local)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepara la búsqueda en el OA.\n// Carga: campo \"escuela\" de Config carga. Vacío = toda la UPM; con un código = solo esa escuela.\n// Actualización: campo \"escuelas\" de Config actualización, códigos separados por comas. Vacío = toda la UPM.\nconst leerConfig = (nombre) => {\n  try { return $(nombre).first().json; } catch (e) { return null; }\n};\nconst cfg = leerConfig('Config actualización') || leerConfig('Config carga') || {};\nlet escuelas = String(cfg.escuelas ?? cfg.escuela ?? '')\n  .split(',').map(s => s.trim()).filter(Boolean);\nif (escuelas.length === 0) escuelas = [''];   // '' = toda la UPM\n\nconst base = (codigo) =>\n  'https://oa.upm.es/cgi/search/archive/advanced?order=-date%2Fcreators_name%2Ftitle&exp=0%7C1%7C-date%2Fcreators_name%2Ftitle%7Carchive%7C-%7C' +\n  (codigo ? 'institution%3Ainstitution%3AANY%3AEQ%3A' + encodeURIComponent(codigo) + '%7C' : '') +\n  'type%3Atype%3AANY%3AEQ%3Aother%7C-%7Ceprint_status%3Aeprint_status%3AANY%3AEQ%3Aarchive%7Cmetadata_visibility%3Ametadata_visibility%3AANY%3AEQ%3Ashow&screen=Search&_action_search=1&search_offset=';\n\nreturn escuelas.map(escuela => ({\n  json: {\n    escuela: escuela || 'toda la UPM',\n    base: base(escuela),\n    url_primera: base(escuela) + '0',\n    pagina_inicio: Math.max(0, Number(cfg.pagina_inicio) || 0),\n    max_paginas: Number(cfg.max_paginas) || 0\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Preparar búsqueda",
+      "id": "ce996d31-9b67-5398-8509-86895a157481",
+      "position": [
+        -2900,
+        120
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Busca TFGs en la base de datos por el nombre de una persona (autor o director/tutor). Búsqueda exacta: ignora mayúsculas, tildes y el orden de nombre y apellidos. Devuelve título, fecha, URL, autor, director, asignaturas y ODS de cada TFG encontrado. Todos los resultados corresponden a esa persona en ese rol; si no devuelve filas, no hay ninguno.",
+        "operation": "executeQuery",
+        "query": "WITH p AS (\n  SELECT array_remove(string_to_array(unaccent(lower(trim($1))), ' '), '') AS palabras,\n         lower(trim($2)) AS rol\n)\nSELECT t.id, t.title AS titulo, t.date AS fecha, t.url, t.document_url AS url_pdf,\n       t.creators_name AS autor, t.contributors_name AS director,\n       t.subjects AS asignaturas, t.ods\nFROM tfg t, p\nWHERE cardinality(p.palabras) > 0\n  AND NOT EXISTS (\n    SELECT 1 FROM unnest(p.palabras) AS w\n    WHERE unaccent(lower(\n      CASE p.rol\n        WHEN 'autor'    THEN coalesce(t.creators_name::text, '')\n        WHEN 'director' THEN coalesce(t.contributors_name::text, '')\n        ELSE coalesce(t.creators_name::text, '') || ' ' || coalesce(t.contributors_name::text, '')\n      END)) NOT LIKE '%' || w || '%'\n  )\nORDER BY t.date DESC\nLIMIT 25;",
+        "options": {
+          "queryReplacement": "={{ [ $fromAI('persona', 'Nombre de la persona tal como lo escribe el usuario, sin la palabra TFG ni el rol. Ejemplo: Borja Bordel', 'string'), $fromAI('rol', 'Uno de estos valores: director (si pregunta por tutor, director o quién dirigió), autor (si pregunta por quién escribió el TFG o por el estudiante), cualquiera (si no está claro)', 'string') ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        -120,
+        -300
+      ],
+      "id": "031bfff8-25dc-56a7-8bd7-5a4179b2caad",
+      "name": "Buscar por persona",
+      "credentials": {
+        "postgres": {
+          "id": "oasisPostgres001",
+          "name": "Postgres TFG"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Carga inicial (manual)": {
+      "main": [
+        [
+          {
+            "node": "Config carga",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Actualización semanal": {
+      "main": [
+        [
+          {
+            "node": "Config actualización",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config carga": {
+      "main": [
+        [
+          {
+            "node": "IDs existentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config actualización": {
+      "main": [
+        [
+          {
+            "node": "IDs existentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IDs existentes": {
+      "main": [
+        [
+          {
+            "node": "Preparar búsqueda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener página web de la OA": {
+      "main": [
+        [
+          {
+            "node": "Extracción de páginas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extracción de páginas": {
+      "main": [
+        [
+          {
+            "node": "Recorrer página",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recorrer página": {
+      "main": [
+        [
+          {
+            "node": "Filtrar TFGs nuevos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Obtener página de TFG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener página de TFG": {
+      "main": [
+        [
+          {
+            "node": "Extraer link TFG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer link TFG": {
+      "main": [
+        [
+          {
+            "node": "Limpiar link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limpiar link": {
+      "main": [
+        [
+          {
+            "node": "Recorrer página",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar TFGs nuevos": {
+      "main": [
+        [
+          {
+            "node": "Recorrer página TFG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recorrer página TFG": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Obtener página TFG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener página TFG": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Privado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No privado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Privado": {
+      "main": [
+        [
+          {
+            "node": "Extracción atributos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No privado": {
+      "main": [
+        [
+          {
+            "node": "Extracción atributos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extracción atributos": {
+      "main": [
+        [
+          {
+            "node": "Unir privado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extracción atributos1": {
+      "main": [
+        [
+          {
+            "node": "Unir no privado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir privado": {
+      "main": [
+        [
+          {
+            "node": "Separar abstract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir no privado": {
+      "main": [
+        [
+          {
+            "node": "Separar abstract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar abstract": {
+      "main": [
+        [
+          {
+            "node": "Unir atributos y normalizar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir atributos y normalizar": {
+      "main": [
+        [
+          {
+            "node": "Creación vector y metadatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Creación vector y metadatos": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store (indexación)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store (indexación)": {
+      "main": [
+        [
+          {
+            "node": "Insertar TFG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar TFG": {
+      "main": [
+        [
+          {
+            "node": "Tiempo de espera",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiempo de espera": {
+      "main": [
+        [
+          {
+            "node": "Recorrer página TFG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Ollama (indexación)": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store (indexación)",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store (indexación)",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat web TFGs": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Ollama": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar búsqueda": {
+      "main": [
+        [
+          {
+            "node": "Obtener página web de la OA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar por persona": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Madrid"
+  },
+  "tags": [],
+  "id": "oasisWorkflow001"
+}

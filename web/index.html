@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OASIS · Buscador de Trabajos Fin de Grado · UPM</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' role='img' aria-label='OASIS'%3E %3Cdefs%3E %3CclipPath id='oasis-c'%3E%3Ccircle cx='32' cy='32' r='30'/%3E%3C/clipPath%3E %3C/defs%3E %3Ccircle cx='32' cy='32' r='30' fill='%23006EB7'/%3E %3Cg clip-path='url%28%23oasis-c%29'%3E %3Crect x='0' y='45' width='64' height='20' fill='%23254B8F'/%3E %3Cpath d='M2 45 q5 -3.2 10 0 t10 0 t10 0 t10 0 t10 0 t10 0' fill='none' stroke='%2300ACE9' stroke-width='2.6' stroke-linecap='round'/%3E %3Cpath d='M10 52.5 q4.5 -2.8 9 0 t9 0 t9 0 t9 0 t9 0' fill='none' stroke='%2300ACE9' stroke-width='2.2' stroke-linecap='round' opacity='.75'/%3E %3C/g%3E %3Cpath d='M30.5 45 C31.2 37.5 32 31 35 23.5' fill='none' stroke='%23FFFFFF' stroke-width='2.8' stroke-linecap='round'/%3E %3Cg fill='%23FFFFFF'%3E %3Cpath d='M35 23.5 C29.5 18.5 22 18.6 17 23.2 C23 21.8 28.6 22.4 35 23.5 Z'/%3E %3Cpath d='M35 23.5 C40.6 18.6 48.4 19 53 24.2 C46.8 22.4 41.2 22.4 35 23.5 Z'/%3E %3Cpath d='M35 23.5 C31.2 16.5 25.4 13.5 19.6 14.6 C25.4 16.6 30.2 19.4 35 23.5 Z'/%3E %3Cpath d='M35 23.5 C38.4 16 44 12.8 50 13.8 C44.2 16 39.4 19.2 35 23.5 Z'/%3E %3Cpath d='M35 23.5 C34.6 17.6 36.4 12.8 39.6 10.2 C37.8 14.6 36.6 18.8 35 23.5 Z'/%3E %3C/g%3E %3C/svg%3E">
+<meta name="description" content="OASIS: busca Trabajos Fin de Grado de la UPM por tema, tutor o autor.">
+
+<!-- Tipografía principal del Manual de Identidad Gráfica UPM (2024): Libre Franklin; alternativa: Arial -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Widget de chat de n8n (versión fijada) -->
+<link href="https://cdn.jsdelivr.net/npm/@n8n/chat@0.27.1/dist/style.css" rel="stylesheet">
+
+<style>
+  /* ==========================================================
+     CONFIGURACIÓN DE COLORES
+     Valores web del Manual de Identidad Gráfica UPM (nov. 2024):
+       #254B8F  Pantone 286 C  fondo corporativo
+       #006EB7  Pantone 285 C  azul del logotipo
+       #00ACE9  Pantone 2995 C azul claro del blasón
+       #706F6F  Cool Gray 11   textos secundarios
+     ========================================================== */
+  :root {
+    --upm-corporativo: #254B8F;
+    --upm-azul: #006EB7;
+    --upm-azul-oscuro: #005590;
+    --upm-azul-claro: #00ACE9;
+    --upm-gris: #706F6F;
+
+    --fondo: #F4F6FA;
+    --superficie: #FFFFFF;
+    --texto: #1B2333;
+    --texto-suave: var(--upm-gris);
+    --borde: #DCE2EC;
+    --sobre-corporativo: #FFFFFF;
+    --sobre-corporativo-suave: #D3DDEE;
+
+    --fuente: "Libre Franklin", Arial, "Helvetica Neue", sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fondo: #0E1626;
+      --superficie: #172235;
+      --texto: #E8EDF5;
+      --texto-suave: #A9B3C4;
+      --borde: #2A3850;
+      --upm-azul: #2F8FD6;
+      --upm-azul-oscuro: #1F78BD;
+      --sobre-corporativo-suave: #C3D0E8;
+      color-scheme: dark;
+    }
+  }
+
+  /* Colores del widget. Se definen las dos variantes de nombre
+     (-color- y --color--) porque cambian entre versiones del widget. */
+  #n8n-chat {
+    --chat--color-primary: var(--upm-azul);
+    --chat--color-primary-shade-50: var(--upm-azul-oscuro);
+    --chat--color-primary-shade-100: var(--upm-corporativo);
+    --chat--color-secondary: var(--upm-azul);
+    --chat--color-secondary-shade-50: var(--upm-azul-oscuro);
+    --chat--color-white: var(--superficie);
+    --chat--color-light: var(--fondo);
+    --chat--color-light-shade-50: var(--borde);
+    --chat--color-light-shade-100: var(--borde);
+    --chat--color-medium: var(--borde);
+    --chat--color-dark: var(--texto);
+    --chat--color-typing: var(--texto-suave);
+    --chat--color--primary: var(--upm-azul);
+    --chat--color--secondary: var(--upm-azul);
+    --chat--color--white: var(--superficie);
+    --chat--color--light: var(--fondo);
+    --chat--color--dark: var(--texto);
+
+    --chat--border-radius: 6px;
+    --chat--message--font-size: 1rem;
+    --chat--message-line-height: 1.6;
+    --chat--message--bot--background: var(--superficie);
+    --chat--message--bot--color: var(--texto);
+    --chat--message--bot--border: 1px solid var(--borde);
+    --chat--message--user--background: var(--upm-azul);
+    --chat--message--user--color: #FFFFFF;
+    --chat--message--pre--background: var(--fondo);
+    --chat--textarea--height: 52px;
+  }
+
+  /* ---------- Base ---------- */
+  :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--fuente);
+    font-size: 1rem;
+    line-height: 1.55;
+    color: var(--texto);
+    background: var(--fondo);
+    display: flex;
+    flex-direction: column;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--upm-azul-claro); outline-offset: 2px; }
+
+  /* ---------- Cabecera institucional ---------- */
+  .cabecera {
+    background: #FFFFFF;
+    border-bottom: 1px solid #DCE2EC;
+  }
+  .cabecera__interior {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .cabecera__logo { display: flex; align-items: center; text-decoration: none; color: #254B8F; }
+  .cabecera__logo img { height: 52px; width: auto; display: block; }
+  .cabecera__logo-texto { font-weight: 700; font-size: 1.05rem; line-height: 1.2; }
+  .marca {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-left: 20px;
+    border-left: 1px solid #DCE2EC;
+    text-decoration: none;
+  }
+  .marca__icono { width: 40px; height: 40px; flex: none; display: block; }
+  .marca__textos { display: flex; flex-direction: column; gap: 3px; }
+  .marca__nombre {
+    color: #254B8F;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+  .marca__sub { color: #706F6F; font-size: 0.8rem; font-weight: 500; line-height: 1.2; }
+  .cabecera__enlace {
+    margin-left: auto;
+    color: #006EB7;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .cabecera__enlace:hover { text-decoration: underline; }
+
+  /* ---------- Banda corporativa ---------- */
+  .banda {
+    background: var(--upm-corporativo);
+    color: var(--sobre-corporativo);
+    padding: 44px 0 120px;
+  }
+  .banda__interior { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  .banda h1 {
+    margin: 0 0 12px;
+    font-size: clamp(1.9rem, 3.6vw, 2.9rem);
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    max-width: 20ch;
+  }
+  .banda p {
+    margin: 0;
+    max-width: 56ch;
+    font-size: 1.1rem;
+    color: var(--sobre-corporativo-suave);
+  }
+
+  /* ---------- Zona de consulta ---------- */
+  .consulta {
+    flex: 1;
+    width: 100%;
+    max-width: 1180px;
+    margin: -88px auto 0;
+    padding: 0 24px 32px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 24px;
+    align-items: start;
+  }
+  .chat {
+    background: var(--superficie);
+    border: 1px solid var(--borde);
+    border-top: 4px solid var(--upm-azul);
+    border-radius: 8px;
+    box-shadow: 0 18px 40px -24px rgba(15, 28, 70, 0.45);
+    height: min(72vh, 720px);
+    min-height: 460px;
+    overflow: hidden;
+  }
+  #n8n-chat { width: 100%; height: 100%; }
+  /* La cabecera propia del widget sobra: la página ya identifica el servicio */
+  #n8n-chat .chat-header { display: none; }
+  #n8n-chat, #n8n-chat textarea, #n8n-chat button { font-family: var(--fuente); }
+  #n8n-chat a { color: var(--upm-azul); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+  #n8n-chat a:hover { color: var(--upm-azul-oscuro); }
+
+  .ayuda {
+    padding-top: 104px;
+    color: var(--texto);
+  }
+  .ayuda h2 {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .ejemplos { list-style: none; margin: 0 0 28px; padding: 0; display: grid; gap: 8px; }
+  .ejemplo {
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    font-size: 0.95rem;
+    color: var(--texto);
+    background: var(--superficie);
+    border: 1px solid var(--borde);
+    border-left: 3px solid var(--upm-azul-claro);
+    border-radius: 4px;
+    padding: 10px 12px;
+    cursor: pointer;
+  }
+  .ejemplo:hover { border-left-color: var(--upm-azul); background: var(--fondo); }
+  .ayuda__nota { margin: 0; font-size: 0.875rem; color: var(--texto-suave); max-width: 34ch; }
+
+  /* ---------- Pie ---------- */
+  .pie {
+    border-top: 1px solid var(--borde);
+    color: var(--texto-suave);
+    font-size: 0.85rem;
+  }
+  .pie__interior {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 18px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 24px;
+    justify-content: space-between;
+  }
+  .pie p { margin: 0; }
+
+  /* ---------- Móvil ---------- */
+  @media (max-width: 860px) {
+    .banda { padding: 28px 0 96px; }
+    .banda__interior { padding: 0 16px; }
+    .consulta { grid-template-columns: minmax(0, 1fr); padding: 0 16px 24px; margin-top: -72px; }
+    .ayuda { min-width: 0; }
+    .chat { height: 70vh; min-height: 420px; }
+    .ayuda { padding-top: 0; }
+    .ejemplos { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; padding-bottom: 4px; }
+    .ejemplo { white-space: nowrap; }
+  }
+  @media (max-width: 520px) {
+    .cabecera__interior { padding: 10px 16px; }
+    .cabecera__logo img { height: 40px; }
+    .cabecera__enlace { display: none; }
+    .marca { padding-left: 14px; }
+    .marca__sub { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="cabecera">
+  <div class="cabecera__interior">
+    <a class="cabecera__logo" href="https://www.upm.es/">
+      <!-- Logotipo oficial: descárgalo de www.upm.es/UPM/SalaPrensa/IdentidadGrafica
+           y guárdalo junto a este archivo como logo-upm.png (versión en color sobre fondo blanco) -->
+      <img src="logo-upm.png" alt="Universidad Politécnica de Madrid"
+           onerror="this.replaceWith(Object.assign(document.createElement('span'), {className: 'cabecera__logo-texto', textContent: 'Universidad Politécnica de Madrid'}))">
+    </a>
+    <a class="marca" href="./" aria-label="OASIS, buscador de Trabajos Fin de Grado">
+      <svg class="marca__icono" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"> <defs> <clipPath id="oasis-c"><circle cx="32" cy="32" r="30"/></clipPath> </defs> <circle cx="32" cy="32" r="30" fill="#006EB7"/> <g clip-path="url(#oasis-c)"> <rect x="0" y="45" width="64" height="20" fill="#254B8F"/> <path d="M2 45 q5 -3.2 10 0 t10 0 t10 0 t10 0 t10 0 t10 0" fill="none" stroke="#00ACE9" stroke-width="2.6" stroke-linecap="round"/> <path d="M10 52.5 q4.5 -2.8 9 0 t9 0 t9 0 t9 0 t9 0" fill="none" stroke="#00ACE9" stroke-width="2.2" stroke-linecap="round" opacity=".75"/> </g> <path d="M30.5 45 C31.2 37.5 32 31 35 23.5" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round"/> <g fill="#FFFFFF"> <path d="M35 23.5 C29.5 18.5 22 18.6 17 23.2 C23 21.8 28.6 22.4 35 23.5 Z"/> <path d="M35 23.5 C40.6 18.6 48.4 19 53 24.2 C46.8 22.4 41.2 22.4 35 23.5 Z"/> <path d="M35 23.5 C31.2 16.5 25.4 13.5 19.6 14.6 C25.4 16.6 30.2 19.4 35 23.5 Z"/> <path d="M35 23.5 C38.4 16 44 12.8 50 13.8 C44.2 16 39.4 19.2 35 23.5 Z"/> <path d="M35 23.5 C34.6 17.6 36.4 12.8 39.6 10.2 C37.8 14.6 36.6 18.8 35 23.5 Z"/> </g> </svg>
+      <span class="marca__textos">
+        <span class="marca__nombre">OASIS</span>
+        <span class="marca__sub">Buscador de Trabajos Fin de Grado</span>
+      </span>
+    </a>
+    <a class="cabecera__enlace" href="https://oa.upm.es/">Archivo Digital UPM</a>
+  </div>
+</header>
+
+<section class="banda">
+  <div class="banda__interior">
+    <h1>Encuentra Trabajos Fin de Grado de la UPM</h1>
+    <p>Pregunta por un tema, por un tutor o por un autor. Las respuestas enlazan a cada trabajo en el Archivo Digital UPM.</p>
+  </div>
+</section>
+
+<main class="consulta">
+  <div class="chat">
+    <div id="n8n-chat"></div>
+  </div>
+
+  <aside class="ayuda" aria-labelledby="titulo-ejemplos">
+    <h2 id="titulo-ejemplos">Prueba con</h2>
+    <ul class="ejemplos">
+      <li><button class="ejemplo" type="button">TFG sobre ciberseguridad</button></li>
+      <li><button class="ejemplo" type="button">TFG sobre energías renovables</button></li>
+      <li><button class="ejemplo" type="button">TFG sobre inteligencia artificial en medicina</button></li>
+      <li><button class="ejemplo" type="button" data-completar>TFG dirigidos por </button></li>
+    </ul>
+    <p class="ayuda__nota">Las respuestas se generan automáticamente a partir de los datos del Archivo Digital UPM. Comprueba cada trabajo en su enlace antes de citarlo.</p>
+  </aside>
+</main>
+
+<footer class="pie">
+  <div class="pie__interior">
+    <p>Universidad Politécnica de Madrid</p>
+    <p>I Convocatoria de ayudas para el desarrollo y despliegue de pilotos de IA para el apoyo docente</p>
+    <p>Este trabajo se basa en los sistemas desarrollados durante la realización de su Trabajo de Fin de Grado de los estudiantes Sergio González Delgado y Hugo Blanco Iraola</p>
+  </div>
+</footer>
+
+<script type="module">
+  import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat@0.27.1/dist/chat.bundle.es.js';
+
+  // ============================================================
+  // URL de producción del Chat Trigger.
+  // Si esta página se sirve desde el mismo dominio que n8n (como en la guía),
+  // basta con la ruta relativa. Si no, pon la URL completa:
+  //   https://TU_DOMINIO/webhook/3106d095-e051-5609-b2ea-2be91db4f815/chat
+  // ============================================================
+  const WEBHOOK_URL = '/webhook/3106d095-e051-5609-b2ea-2be91db4f815/chat';
+
+  createChat({
+    webhookUrl: WEBHOOK_URL,
+    target: '#n8n-chat',
+    mode: 'fullscreen',
+    showWelcomeScreen: false,
+    loadPreviousSession: false,
+    defaultLanguage: 'en',
+    initialMessages: [
+      'Hola, soy OASIS. Puedo buscar Trabajos Fin de Grado de la UPM por tema, por tutor o por autor. ¿Qué estás buscando?'
+    ],
+    i18n: {
+      en: {
+        title: 'OASIS',
+        subtitle: '',
+        footer: '',
+        getStarted: 'Nueva conversación',
+        inputPlaceholder: 'Escribe tu pregunta…',
+        closeButtonTooltip: 'Cerrar'
+      }
+    }
+  });
+
+  // Los enlaces de las respuestas se abren en una pestaña nueva, para no perder la conversación
+  const zonaChat = document.getElementById('n8n-chat');
+  new MutationObserver(() => {
+    zonaChat.querySelectorAll('a[href^="http"]:not([target])').forEach((a) => {
+      a.target = '_blank';
+      a.rel = 'noopener';
+    });
+  }).observe(zonaChat, { childList: true, subtree: true });
+
+  // Los ejemplos rellenan la caja de texto del chat
+  document.querySelectorAll('.ejemplo').forEach((boton) => {
+    boton.addEventListener('click', () => {
+      const caja = document.querySelector('#n8n-chat textarea');
+      if (!caja) return;
+      caja.value = boton.textContent;
+      caja.dispatchEvent(new Event('input', { bubbles: true }));
+      caja.focus();
+      if (boton.hasAttribute('data-completar')) {
+        caja.setSelectionRange(caja.value.length, caja.value.length);
+      }
+    });
+  });
+</script>
+</body>
+</html>
