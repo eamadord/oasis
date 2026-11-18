@@ -1,4 +1,4 @@
-# OASIS · Buscador de Trabajos Fin de Grado de la UPM
+# 🌴 OASIS · Buscador de Trabajos Fin de Grado de la UPM
 
 OASIS recopila los TFG del Archivo Digital UPM, los guarda en una base de datos y una base vectorial, y permite consultarlos en lenguaje natural desde una página web. Todo el sistema se despliega con Docker Compose.
 
@@ -52,8 +52,6 @@ Los comandos son para PowerShell; en Linux o macOS, usa `cp` y tu editor habitua
 6. Abre `http://localhost:8080`: es OASIS.
 
 Para ampliar la base de datos, sube `max_paginas` y vuelve a ejecutar la carga. Los TFGs que ya están se omiten.
-
-**Logotipo de la UPM:** descarga el oficial de la [página de identidad gráfica de la UPM](https://www.upm.es/UPM/SalaPrensa/IdentidadGrafica) y guárdalo como `web/logo-upm.png`. Mientras no esté, la página muestra el nombre de la universidad en texto.
 
 ## Comandos útiles
 
